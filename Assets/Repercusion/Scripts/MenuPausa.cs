@@ -22,6 +22,8 @@ namespace Repercusion
 
         private void Update()
         {
+            // Si se está leyendo una tablilla, Esc cierra la lectura, no abre la pausa
+            if (PanelLectura.Abierto || Time.frameCount == PanelLectura.UltimoCierre) return;
             if (Entrada.Tecla(KeyCode.Escape) || Entrada.Tecla(KeyCode.P))
             {
                 if (EnPausa) Continuar();

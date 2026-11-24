@@ -93,7 +93,7 @@ namespace Repercusion
             if (puntoCentro != null) Teletransportar(jugador, puntoCentro.position);
 
             alQuedarseSinLuz?.Invoke();
-            Mensaje("Tu luz se apagó... vuelves al centro");
+            Mensaje("Tu luz se apagó... vuelves al inicio");
         }
 
         public static void Teletransportar(GameObject objeto, Vector2 destino)

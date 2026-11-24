@@ -22,6 +22,16 @@ namespace Repercusion
 #endif
         }
 
+        // Cualquier tecla del teclado (o clic) en este cuadro
+        public static bool CualquierTecla()
+        {
+#if ENABLE_INPUT_SYSTEM
+            return (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame) || Clic();
+#else
+            return Input.anyKeyDown;
+#endif
+        }
+
         public static bool Clic()
         {
 #if ENABLE_INPUT_SYSTEM

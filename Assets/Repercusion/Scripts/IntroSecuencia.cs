@@ -25,12 +25,14 @@ namespace Repercusion
 
         public Diapositiva[] diapositivas =
         {
-            new Diapositiva { texto = "Eco pasó años construyendo una sola máquina:\nuna puerta para volver atrás en el tiempo." },
-            new Diapositiva { texto = "Quería corregir un error.\nSolo uno." },
-            new Diapositiva { texto = "No esperó a que estuviera lista." },
-            new Diapositiva { texto = "Y el tiempo se rompió.", glitch = true, espera = 1.5f },
-            new Diapositiva { texto = "Ahora, cada vez que lo intenta de nuevo,\nlo que hizo antes se queda atrás… repitiéndose." },
-            new Diapositiva { texto = "Ecos de lo que pudo haber sido.", espera = 3f },
+            new Diapositiva { texto = "Eco era una científica brillante…\ny ambiciosa." },
+            new Diapositiva { texto = "Quería crear lo que nadie había logrado:\nuna máquina para atravesar el tiempo." },
+            new Diapositiva { texto = "Estuvo a punto de conseguirlo." },
+            new Diapositiva { texto = "Y entonces, falló.", glitch = true, espera = 1.5f },
+            new Diapositiva { texto = "Despertó en un calabozo\nque no existe en ningún tiempo." },
+            new Diapositiva { texto = "La única salida está sellada con tres llaves." },
+            new Diapositiva { texto = "Aquí la fuerza no sirve.\nSolo su ingenio…" },
+            new Diapositiva { texto = "…y los ecos de lo que pudo haber sido.", espera = 3f },
         };
 
         [Header("Partes (las conecta el menú Repercusión)")]

@@ -17,6 +17,16 @@ namespace Repercusion
         [Tooltip("Cuántos ecos puede haber a la vez en esta sala")]
         [Min(0)] public int maxEcos = 1;
 
+        [Tooltip("Activado: el eco aparece quieto donde estás y tú sigues ahí mismo.\n" +
+                 "Desactivado: el eco repite tu intento y tú vuelves al inicio.")]
+        public bool ecosQuietos = true;
+
+        [Tooltip("Activado: los ecos aparecen solos al pisar las losas (LosasEnOrden); la tecla E no hace nada")]
+        public bool ecosAutomaticos = false;
+
+        [Tooltip("Segundos que dura cada eco antes de desvanecerse (0 = para siempre)")]
+        [Min(0f)] public float vidaEco = 0f;
+
         public Vector2 Inicio => puntoInicio != null ? (Vector2)puntoInicio.position : (Vector2)transform.position;
 
         private void Reset()

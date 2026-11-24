@@ -240,7 +240,7 @@ namespace Repercusion.Herramientas
 
             string filas =
                 "<color=#F5F5F5>W  A  S  D</color><pos=300>Moverte (también con las flechas)\n" +
-                "<color=#F5F5F5>R</color><pos=300>Nuevo intento: tu intento anterior se queda como un eco\n" +
+                "<color=#F5F5F5>E</color><pos=300>Dejar un eco: una copia de ti se queda donde estás\n" +
                 "<color=#F5F5F5>ESC</color><pos=300>Pausa";
             TextMeshProUGUI controles = TextoArribaIzq(comoJugar.transform, "Controles", filas, 26f, GRIS, MARGEN, 380f, 1300f, 140f, 0f);
             controles.lineSpacing = 30f;
@@ -429,7 +429,7 @@ namespace Repercusion.Herramientas
             Colocar(panelEcos, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(0f, 0f),
                     new Vector2(72f, 56f), new Vector2(600f, 80f));
             TextMeshProUGUI textoEcos = TextoArribaIzq(panelEcos.transform, "TextoEcos", "ECOS  0/1", 24f, BLANCO, 0f, 0f, 600f, 34f, 12f);
-            TextoArribaIzq(panelEcos.transform, "Pista", "R  —  NUEVO INTENTO", 16f, GRIS, 0f, 44f, 600f, 26f, ESPACIADO);
+            TextoArribaIzq(panelEcos.transform, "Pista", "E  —  DEJAR ECO", 16f, GRIS, 0f, 44f, 600f, 26f, ESPACIADO);
             panelEcos.SetActive(false);
 
             // ---- Pista de pausa (abajo a la derecha)
@@ -703,7 +703,10 @@ namespace Repercusion.Herramientas
             SalaPuzle sala = raiz.AddComponent<SalaPuzle>();
             sala.nombreSala = "Sala 1";
             sala.subtitulo = "El primer eco";
-            sala.maxEcos = 2;
+            sala.maxEcos = 4;
+            sala.ecosQuietos = true;
+            sala.ecosAutomaticos = true;   // al pisar una losa, el eco se queda solo
+            sala.vidaEco = 30f;            // ...pero se desvanece a los 30 s: hay que darse prisa
 
             System.Func<float, float, Vector2> L = (x, y) => new Vector2(x - centro.x, y - centro.y);
 
@@ -721,17 +724,18 @@ namespace Repercusion.Herramientas
             oscCol.size = new Vector2(33f, 13f);
             ZonaPeligro oscuridad = osc.AddComponent<ZonaPeligro>();
             oscuridad.golpeAlEntrar = 0f;
-            oscuridad.perdidaPorSegundo = 3f;
+            oscuridad.perdidaPorSegundo = 2f;
 
             // Braseros: recargan la luz
             Brasero(raiz, "Brasero_Entrada", L(12.5f, 39.5f), orden);
             Brasero(raiz, "Brasero_Reja", L(-10.5f, 39.5f), orden);
 
-            // Placas: dos en la sombra (las buenas) y dos junto al fuego (trampa). Se ven iguales.
-            PlacaPresion sombraA = Placa(raiz, "Placa_Sombra_Centro", L(1.5f, 39.5f), orden, ordenMuro + 1, false);
-            PlacaPresion sombraB = Placa(raiz, "Placa_Sombra_Esquina", L(19.5f, 42.5f), orden, ordenMuro + 1, false);
-            PlacaPresion fuegoA = Placa(raiz, "Placa_Fuego_Entrada", L(9.5f, 42.5f), orden, ordenMuro + 1, true);
-            PlacaPresion fuegoB = Placa(raiz, "Placa_Fuego_Reja", L(-9f, 42.5f), orden, ordenMuro + 1, true);
+            // Cuatro losas con símbolos. Al pisar una, tu eco se queda en ella.
+            // La reja pide las cuatro en el orden de la tablilla: reloj, llama, ojo, luna.
+            PlacaPresion losaReloj = Placa(raiz, "Losa_Reloj", "reloj", L(-9f, 42.5f), orden, ordenMuro + 1, false);
+            PlacaPresion losaLuna = Placa(raiz, "Losa_Luna", "luna", L(9.5f, 42.5f), orden, ordenMuro + 1, false);
+            PlacaPresion losaOjo = Placa(raiz, "Losa_Ojo", "ojo", L(19.5f, 42.5f), orden, ordenMuro + 1, false);
+            PlacaPresion losaLlama = Placa(raiz, "Losa_Llama", "llama", L(1.5f, 39.5f), orden, ordenMuro + 1, false);
 
             // Mensaje de inicio en español
             GameManager gm = Object.FindAnyObjectByType<GameManager>();
@@ -748,8 +752,15 @@ namespace Repercusion.Herramientas
             BoxCollider2D puertaCol = puertaGO.AddComponent<BoxCollider2D>();
             puertaCol.size = new Vector2(3f, 3f);
             Puerta puerta = puertaGO.AddComponent<Puerta>();
-            puerta.placas = new[] { sombraA, sombraB };
-            puerta.placasProhibidas = new[] { fuegoA, fuegoB };
+            puerta.placas = new[] { losaReloj, losaLlama, losaOjo, losaLuna };
+            puerta.enOrden = true;
+            puerta.placasProhibidas = new PlacaPresion[0];
+            puerta.quedarseAbierta = true;   // una vez resuelto, la reja ya no se cierra
+
+            LosasEnOrden enOrden = raiz.AddComponent<LosasEnOrden>();
+            enOrden.losas = new[] { losaReloj, losaLlama, losaOjo, losaLuna };
+            enOrden.reja = puerta;
+            enOrden.fuenteSusurro = Fuente("Titulo");
             puerta.bloqueo = puertaCol;
             puerta.visual = puertaSR;
             puerta.spriteCerrada = S("px_puerta_cerrada");
@@ -757,20 +768,70 @@ namespace Repercusion.Herramientas
             puerta.colorAbierta = Color.white;
             Luz(puertaGO, "Luz", new Vector2(0f, -1.2f), new Color(0.8f, 0.9f, 0.95f), 0.35f, 3f);
 
-            // Inscripción con el acertijo, pegada al muro cerca de la entrada
-            GameObject tabla = Hijo(raiz, "Inscripcion", L(14.5f, 43f));
-            Dibujo(tabla, "px_inscripcion", orden, orden.objetos);
-            Luz(tabla, "Luz", new Vector2(0f, 0.6f), new Color(0.45f, 1f, 0.9f), 0.6f, 2.2f);
-            Pista(raiz, "Leer_Inscripcion", L(14.5f, 43.2f), new Vector2(2f, 1.2f),
-                "«Dos piedras duermen donde el fuego no llega.\nLas que arden junto a la llama mienten.\nSola no basta: deja atrás a quien fuiste.»", false, 8f);
+            // Tablilla con el acertijo, colgada en la cara del muro (y 44..46), entre la luna y el ojo.
+            // Ya no está en el piso: el muro no deja pasar, así que no estorba el camino.
+            // Brilla y late en verde para que se note que ahí está la clave.
+            GameObject tabla = Hijo(raiz, "Inscripcion", L(14.5f, 45.2f));
+            SpriteRenderer tablaSR = Dibujo(tabla, "px_inscripcion", orden, ordenMuro + 1);
+            GameObject tablaLuz = Luz(tabla, "Luz", new Vector2(0f, -0.4f), new Color(0.45f, 1f, 0.9f), 1.2f, 3.2f);
+            Fuego latido = tabla.AddComponent<Fuego>();   // la luz late suave para que se note
+            latido.render = tablaSR;
+            latido.cuadros = new Sprite[0];
+            latido.luz = tablaLuz.GetComponent<Light2D>();
+            latido.radioBase = 3.2f;
+            latido.intensidadBase = 1.2f;
+
+            // Halo verde detrás de la tablilla: un resplandor sobre la piedra del muro
+            GameObject halo = Hijo(tabla, "Halo", Vector2.zero);
+            SpriteRenderer haloSR = Dibujo(halo, "px_inscripcion", orden, ordenMuro);
+            haloSR.color = new Color(0.45f, 1f, 0.9f, 0.35f);
+            halo.transform.localScale = new Vector3(1.35f, 1.25f, 1f);
+            Luz(tabla, "Resplandor", Vector2.zero, new Color(0.45f, 1f, 0.9f), 0.6f, 1.4f);
+
+            // Texto flotante: el acertijo aparece sobre la tablilla cuando te acercas (sin tecla)
+            GameObject aviso = Hijo(tabla, "Aviso", new Vector2(4.4f, 0.2f));   // a la derecha, sobre el muro
+            TextMeshPro avisoTxt = aviso.AddComponent<TextMeshPro>();
+            TMP_FontAsset titulo = Fuente("Titulo");
+            if (titulo != null) avisoTxt.font = titulo;
+            avisoTxt.text = "";
+            avisoTxt.fontSize = 2.6f;
+            avisoTxt.lineSpacing = 0f;
+            avisoTxt.alignment = TextAlignmentOptions.Left;
+            avisoTxt.color = new Color(0.8f, 1f, 0.96f);
+            avisoTxt.rectTransform.sizeDelta = new Vector2(6.6f, 3f);
+            avisoTxt.sortingLayerID = orden.capa;
+            avisoTxt.sortingOrder = orden.objetos + 5;
+
+            Tablilla tablilla = tabla.AddComponent<Tablilla>();
+            tablilla.titulo = "Tablilla de piedra";
+            tablilla.texto = "«Primero, lo que cuenta el tiempo perdido.\nDespués, lo que arde en la oscuridad.\n" +
+                             "Luego, lo que todo lo mira.\nAl final, lo que brilla sin quemar.»";
+            tablilla.simbolos = new[] { S("px_losa_luna"), S("px_losa_ojo"), S("px_losa_llama"), S("px_losa_reloj") };
+            tablilla.marcador = null;   // ahora la señala la flecha guía
+            tablilla.aviso = aviso;
+
+            CrearPanelLectura();
 
             // Pistas
             Pista(raiz, "Pista_Reja", L(-5.5f, 41.5f), new Vector2(3f, 3f),
-                "La reja pide dos piedras a la vez... y alguien que cruce", true, 4f);
+                "La reja pide las cuatro losas, en el orden de la tablilla", true, 4f);
 
             // Guía: instrucciones paso a paso mientras juegas la sala
             GuiaSala guia = raiz.AddComponent<GuiaSala>();
-            guia.placasBuenas = new[] { sombraA, sombraB };
+            guia.placasBuenas = new PlacaPresion[0];
+
+            // El texto de ayuda del HUD: aquí no se usa la E
+            GameObject uiJuego = Buscar("UI_Juego");
+            if (uiJuego != null)
+            {
+                foreach (TMP_Text t in uiJuego.GetComponentsInChildren<TMP_Text>(true))
+                {
+                    if (!t.text.Contains("DEJAR ECO") && !t.text.Contains("NUEVO INTENTO") && !t.text.Contains("PISA UNA LOSA")) continue;
+                    Undo.RecordObject(t, "Ayuda de ecos");
+                    t.text = "PISA UNA LOSA  —  TU ECO SE QUEDA UN RATO";
+                    EditorUtility.SetDirty(t);
+                }
+            }
             guia.reja = puerta;
 
             // Llave arriba, detrás de la reja
@@ -781,6 +842,21 @@ namespace Repercusion.Herramientas
                 llave.localScale = new Vector3(1.4f, 1.4f, 1f);
                 Luz(llave.gameObject, "Luz", Vector2.zero, new Color(1f, 0.85f, 0.5f), 0.8f, 2.2f);
             }
+
+            // Flecha guía: señala la tablilla, luego la siguiente losa (tras el primer error) y luego la llave.
+            // Las losas libres laten con luz verde para que se note que hay que ir ahí.
+            GameObject flechaGO = Hijo(raiz, "GuideArrow", L(14.5f, 47f));
+            Dibujo(flechaGO, "px_flecha", orden, orden.objetos + 6);
+            flechaGO.transform.localScale = new Vector3(1.3f, 1.3f, 1f);
+            Luz(flechaGO, "Luz", Vector2.zero, new Color(0.45f, 1f, 0.9f), 0.8f, 1.6f);
+            FlechaGuia guiaFlecha = raiz.AddComponent<FlechaGuia>();
+            guiaFlecha.tablilla = tablilla;
+            guiaFlecha.losas = new[] { losaReloj, losaLlama, losaOjo, losaLuna };
+            guiaFlecha.reja = puerta;
+            guiaFlecha.llave = llave;
+            guiaFlecha.losasEnOrden = enOrden;
+            guiaFlecha.flecha = flechaGO.transform;
+            guiaFlecha.mostrarOrdenSiempre = false;
 
             // Eco: pisa con los pies, y su eco repite los últimos 12 s
             GameObject ecoJugador = BuscarEco();
@@ -823,21 +899,21 @@ namespace Repercusion.Herramientas
             EditorSceneManager.MarkSceneDirty(raiz.scene);
         }
 
-        private static PlacaPresion Placa(GameObject raiz, string nombre, Vector2 local, Orden orden, int ordenEnCapa, bool trampa)
+        private static PlacaPresion Placa(GameObject raiz, string nombre, string simbolo, Vector2 local, Orden orden, int ordenEnCapa, bool trampa)
         {
             GameObject go = Hijo(raiz, nombre, local);
-            SpriteRenderer sr = Dibujo(go, "px_placa_suelta", orden, ordenEnCapa);
+            SpriteRenderer sr = Dibujo(go, "px_losa_" + simbolo, orden, ordenEnCapa);
             BoxCollider2D col = go.AddComponent<BoxCollider2D>();
             col.isTrigger = true;
             col.size = new Vector2(1.6f, 1.6f);
             PlacaPresion placa = go.AddComponent<PlacaPresion>();
             placa.visual = sr;
-            placa.spriteSuelta = S("px_placa_suelta");
-            placa.spritePresionada = S("px_placa_presionada");
+            placa.spriteSuelta = S("px_losa_" + simbolo);
+            placa.spritePresionada = S("px_losa_" + simbolo + "_on");
             GameObject brillo = Luz(go, "Brillo", Vector2.zero, new Color(0.45f, 1f, 0.9f), 0.9f, 1.8f);
             brillo.SetActive(false);
             placa.encenderAlPresionar = brillo;
-            if (trampa) go.AddComponent<PlacaTrampa>();
+            if (trampa) go.AddComponent<PlacaTrampa>().mensaje = "Esa losa mentía…";
             return placa;
         }
 
@@ -913,6 +989,68 @@ namespace Repercusion.Herramientas
                 lv.intensidad = 1.25f;
                 lv.radioMaximo = 7.5f;
             }
+        }
+
+        // Panel para leer tablillas, dentro de la UI del juego (UI_Juego)
+        private static void CrearPanelLectura()
+        {
+            GameObject ui = Buscar("UI_Juego");
+            if (ui == null) return;
+            Transform viejo = ui.transform.Find("PanelLectura");
+            if (viejo == null) viejo = ui.transform.Find(EnIngles("PanelLectura"));
+            if (viejo != null) Undo.DestroyObjectImmediate(viejo.gameObject);
+
+            GameObject capa = NuevoUI("PanelLectura", ui.transform);
+            Undo.RegisterCreatedObjectUndo(capa, "Panel de lectura");
+            Estirar(capa, 0f);
+            Imagen(capa, null, CAPA_OSCURA, true);
+            FondoConCirculos(capa.transform, 0.35f, false);
+            CanvasGroup grupo = capa.AddComponent<CanvasGroup>();
+            grupo.alpha = 0f;
+            grupo.blocksRaycasts = false;
+            grupo.interactable = false;
+
+            TextMeshProUGUI etiqueta = Texto(capa.transform, "Firma", "TABLILLA DE PIEDRA", 20f, GRIS, TextAlignmentOptions.Center);
+            etiqueta.characterSpacing = ESPACIADO;
+            Colocar(etiqueta.gameObject, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                    new Vector2(0f, 300f), new Vector2(900f, 40f));
+
+            GameObject linea = NuevoUI("Linea", capa.transform);
+            Colocar(linea, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                    new Vector2(0f, 262f), new Vector2(120f, 1f));
+            Imagen(linea, null, new Color(1f, 1f, 1f, 0.35f));
+
+            TextMeshProUGUI cuerpo = Texto(capa.transform, "Texto", "", 50f, BLANCO, TextAlignmentOptions.Center, false, true);
+            cuerpo.lineSpacing = 18f;
+            Colocar(cuerpo.gameObject, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                    new Vector2(0f, 40f), new Vector2(1400f, 400f));
+
+            GameObject fila = NuevoUI("Simbolos", capa.transform);
+            Colocar(fila, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                    new Vector2(0f, -250f), new Vector2(700f, 110f));
+            UnityEngine.UI.Image[] iconos = new UnityEngine.UI.Image[4];
+            for (int i = 0; i < 4; i++)
+            {
+                GameObject ic = NuevoUI("Simbolo" + (i + 1), fila.transform);
+                Colocar(ic, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                        new Vector2(-240f + i * 160f, 0f), new Vector2(96f, 96f));
+                iconos[i] = Imagen(ic, null, Color.white);
+                iconos[i].preserveAspect = true;
+            }
+
+            TextMeshProUGUI pie = Texto(capa.transform, "Pie", "CUALQUIER TECLA  —  CERRAR", 18f, GRIS_OSCURO, TextAlignmentOptions.Center);
+            pie.characterSpacing = ESPACIADO;
+            Colocar(pie.gameObject, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                    new Vector2(0f, -390f), new Vector2(900f, 40f));
+
+            PanelLectura panel = capa.AddComponent<PanelLectura>();
+            panel.grupo = grupo;
+            panel.titulo = etiqueta;
+            panel.texto = cuerpo;
+            panel.simbolos = iconos;
+            panel.pie = pie;
+            panel.cierreAutomatico = 15f;
+            EditorUtility.SetDirty(panel);
         }
 
         // Muro horizontal de x0 a x1 (mundo), cara de ladrillo de 2 casillas + tope de 1, con colisión
@@ -1451,9 +1589,13 @@ namespace Repercusion.Herramientas
             { "Brasero", "Brazier" }, { "Brasero_Entrada", "Brazier_Entrance" }, { "Brasero_Reja", "Brazier_Gate" },
             { "Placa", "PressurePlate" }, { "Placa_Sombra_Centro", "Plate_Shadow_Center" },
             { "Placa_Sombra_Esquina", "Plate_Shadow_Corner" }, { "Placa_Fuego_Entrada", "Plate_Fire_Entrance" },
-            { "Placa_Fuego_Reja", "Plate_Fire_Gate" }, { "Brillo", "Glow" }, { "Luz", "Light" },
+            { "Placa_Fuego_Reja", "Plate_Fire_Gate" },
+            { "Losa_Reloj", "Slab_Hourglass" }, { "Losa_Luna", "Slab_Moon" }, { "Losa_Ojo", "Slab_Eye" },
+            { "Losa_Llama", "Slab_Flame" },
+            { "Musica", "Music" }, { "Sonidos", "SoundEffects" }, { "Brillo", "Glow" }, { "Luz", "Light" },
             { "Reja", "Gate" }, { "Puerta", "Door" }, { "PuertaSalida", "ExitDoor" }, { "Llave", "Key" },
-            { "Inscripcion", "Inscription" }, { "Leer_Inscripcion", "Read_Inscription" },
+            { "Inscripcion", "Inscription" }, { "Marcador", "Marker" }, { "Aviso", "Prompt" },
+            { "PanelLectura", "ReadingPanel" }, { "Simbolos", "Symbols" }, { "Simbolo", "Symbol" }, { "Leer_Inscripcion", "Read_Inscription" },
             { "Pista", "Hint" }, { "Pista_Entrada", "Hint_Entrance" }, { "Pista_Reja", "Hint_Gate" },
             { "ZonaPeligro", "DangerZone" }, { "PruebaLuz", "LightTest" }, { "Pocion", "Potion" },
             { "Paredes_Colision", "Walls_Collision" }, { "Paredes_Dibujo", "Walls_Art" },
@@ -1539,6 +1681,191 @@ namespace Repercusion.Herramientas
             }
             if (!string.IsNullOrEmpty(abierta)) EditorSceneManager.OpenScene(abierta, OpenSceneMode.Single);
             Debug.Log("Repercusión: nombres en inglés en " + n + " escenas.");
+        }
+
+        // Cambia los textos viejos de la tecla R por la tecla E en todas las escenas del Build
+        [MenuItem(MENU + "11. Textos de la tecla E (todas las escenas)", priority = 30)]
+        public static void TextosTeclaE()
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            string abierta = SceneManager.GetActiveScene().path;
+            Dictionary<string, string> cambios = new Dictionary<string, string>
+            {
+                { "R  —  NUEVO INTENTO", "E  —  DEJAR ECO" },
+                { "<color=#F5F5F5>R</color><pos=300>Nuevo intento: tu intento anterior se queda como un eco",
+                  "<color=#F5F5F5>E</color><pos=300>Dejar un eco: una copia de ti se queda donde estás" },
+            };
+            int n = 0;
+            foreach (EditorBuildSettingsScene e in EditorBuildSettings.scenes)
+            {
+                if (string.IsNullOrEmpty(e.path) || !File.Exists(e.path)) continue;
+                Scene escena = EditorSceneManager.OpenScene(e.path, OpenSceneMode.Single);
+                bool cambio = false;
+                foreach (GameObject raiz in escena.GetRootGameObjects())
+                {
+                    foreach (TMP_Text t in raiz.GetComponentsInChildren<TMP_Text>(true))
+                    {
+                        string nuevoTexto = t.text;
+                        foreach (KeyValuePair<string, string> kv in cambios) nuevoTexto = nuevoTexto.Replace(kv.Key, kv.Value);
+                        if (nuevoTexto == t.text) continue;
+                        Undo.RecordObject(t, "Texto tecla E");
+                        t.text = nuevoTexto;
+                        EditorUtility.SetDirty(t);
+                        cambio = true;
+                        n++;
+                    }
+                    foreach (GuiaSala g in raiz.GetComponentsInChildren<GuiaSala>(true))
+                    {
+                        if (!g.enPlacaBuena.Contains("Presiona R")) continue;
+                        g.enPlacaBuena = g.enPlacaBuena.Replace("Presiona R", "Presiona E");
+                        EditorUtility.SetDirty(g);
+                        cambio = true;
+                        n++;
+                    }
+                }
+                if (cambio) EditorSceneManager.SaveScene(escena);
+            }
+            if (!string.IsNullOrEmpty(abierta)) EditorSceneManager.OpenScene(abierta, OpenSceneMode.Single);
+            Debug.Log("Repercusión: " + n + " textos cambiados a la tecla E.");
+        }
+
+        // =====================================================================
+        // 12. AUDIO: música de fondo, pasos de Eco y efectos (eco, losa, reja, llave, trampa)
+        // Los sonidos están en Repercusion/Audio. Para cambiar uno, reemplaza el .wav con el mismo nombre.
+        // =====================================================================
+
+        private static AudioClip Audio(string nombre)
+        {
+            AudioClip c = AssetDatabase.LoadAssetAtPath<AudioClip>(Raiz() + "/Audio/" + nombre + ".wav");
+            if (c == null) Debug.LogWarning("Repercusión: no encontré el audio " + nombre);
+            return c;
+        }
+
+        private static void ConfigurarAudios()
+        {
+            foreach (string id in AssetDatabase.FindAssets("t:AudioClip", new[] { Raiz() + "/Audio" }))
+            {
+                string ruta = AssetDatabase.GUIDToAssetPath(id);
+                AudioImporter ai = AssetImporter.GetAtPath(ruta) as AudioImporter;
+                if (ai == null) continue;
+                bool musica = Path.GetFileName(ruta).StartsWith("musica_");
+                AudioImporterSampleSettings st = ai.defaultSampleSettings;
+                AudioClipLoadType carga = musica ? AudioClipLoadType.Streaming : AudioClipLoadType.DecompressOnLoad;
+                if (st.loadType == carga && ai.forceToMono) continue;
+                st.loadType = carga;
+                st.compressionFormat = AudioCompressionFormat.Vorbis;
+                st.quality = musica ? 0.6f : 0.8f;
+                ai.defaultSampleSettings = st;
+                ai.forceToMono = true;
+                ai.SaveAndReimport();
+            }
+        }
+
+        [MenuItem(MENU + "12. Música y sonidos (todas las escenas)", priority = 31)]
+        public static void PonerAudio()
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            ConfigurarAudios();
+            string abierta = SceneManager.GetActiveScene().path;
+
+            foreach (EditorBuildSettingsScene e in EditorBuildSettings.scenes)
+            {
+                if (string.IsNullOrEmpty(e.path) || !File.Exists(e.path)) continue;
+                Scene escena = EditorSceneManager.OpenScene(e.path, OpenSceneMode.Single);
+                bool esJuego = Object.FindAnyObjectByType<GameManager>() != null;
+
+                // Música
+                GameObject m = Buscar("Musica");
+                if (m == null) { m = new GameObject("Musica"); Undo.RegisterCreatedObjectUndo(m, "Música"); }
+                MusicaFondo mf = m.GetComponent<MusicaFondo>();
+                if (mf == null) mf = m.AddComponent<MusicaFondo>();
+                mf.musica = Audio(esJuego ? "musica_calabozo" : "musica_menu");
+                mf.volumen = esJuego ? 0.45f : 0.5f;
+                EditorUtility.SetDirty(mf);
+
+                if (esJuego)
+                {
+                    // Efectos
+                    GameObject sj = Buscar("Sonidos");
+                    if (sj == null) { sj = new GameObject("Sonidos"); Undo.RegisterCreatedObjectUndo(sj, "Sonidos"); }
+                    SonidosJuego s = sj.GetComponent<SonidosJuego>();
+                    if (s == null) s = sj.AddComponent<SonidosJuego>();
+                    s.eco = Audio("sfx_eco");
+                    s.losa = Audio("sfx_losa");
+                    s.reja = Audio("sfx_reja");
+                    s.llave = Audio("sfx_llave");
+                    s.trampa = Audio("sfx_trampa");
+                    EditorUtility.SetDirty(s);
+
+                    // Pasos de Eco
+                    GameObject eco = BuscarEco();
+                    if (eco != null)
+                    {
+                        Pasos p = eco.GetComponent<Pasos>();
+                        if (p == null) p = Undo.AddComponent<Pasos>(eco);
+                        p.pasos = new[] { Audio("sfx_paso_1"), Audio("sfx_paso_2"), Audio("sfx_paso_3"), Audio("sfx_paso_4") };
+                        EditorUtility.SetDirty(p);
+                    }
+                }
+
+                TraducirEscena(escena);
+                EditorSceneManager.SaveScene(escena);
+            }
+            if (!string.IsNullOrEmpty(abierta)) EditorSceneManager.OpenScene(abierta, OpenSceneMode.Single);
+            Debug.Log("Repercusión: música y sonidos listos.");
+        }
+
+        // Puerta de salida en el cuarto del centro: el final de la demo.
+        // Con las 3 llaves se abre, sale "Escapaste" y vuelve al menú principal.
+        [MenuItem(MENU + "5b. Puerta de salida en el cuarto del centro", priority = 24)]
+        public static void PuertaSalidaCentro()
+        {
+            Preparar(false);
+            Orden orden = CalcularOrden();
+            int ordenMuro = OrdenParedes(orden);
+
+            GameObject vieja = Buscar("PuertaSalida");
+            if (vieja != null) Undo.DestroyObjectImmediate(vieja);
+
+            GameObject go = new GameObject("PuertaSalida");
+            Undo.RegisterCreatedObjectUndo(go, "Puerta de salida");
+            go.transform.position = new Vector3(56.5f, 10f, 0f);
+            go.transform.localScale = new Vector3(1.4f, 1.4f, 1f);
+
+            SpriteRenderer sr = Dibujo(go, "px_puerta_cerrada", orden, orden.objetos);
+            sr.color = new Color(1f, 0.85f, 0.55f);
+            BoxCollider2D bloqueo = go.AddComponent<BoxCollider2D>();
+            bloqueo.offset = new Vector2(0f, -1.1f);
+            bloqueo.size = new Vector2(3f, 0.8f);
+            BoxCollider2D zona = go.AddComponent<BoxCollider2D>();
+            zona.isTrigger = true;
+            zona.offset = new Vector2(0f, -1.6f);
+            zona.size = new Vector2(3.6f, 2.4f);
+
+            PuertaSalida ps = go.AddComponent<PuertaSalida>();
+            ps.bloqueo = bloqueo;
+            ps.visual = sr;
+            ps.spriteAbierta = S("px_puerta_abierta");
+            ps.colorAbierta = Color.white;
+            ps.mensajeFinal = "Eco cruzó la puerta. Escapó del calabozo… por ahora.\nFin de la demo";
+            ps.escenaAlTerminar = "MenuPrincipal";
+            ps.esperaAntesDeCargar = 4f;
+
+            Luz(go, "Luz", new Vector2(0f, 0f), new Color(1f, 0.85f, 0.55f), 1.2f, 5f);
+
+            // Los objetos de decoración pegados a la puerta estorban: se quitan (la alfombra se queda)
+            foreach (SpriteRenderer otro in Object.FindObjectsByType<SpriteRenderer>())
+            {
+                if (otro == null || otro.gameObject == go) continue;
+                if (otro.transform.parent == null || !otro.transform.parent.name.StartsWith("Decor_Center")) continue;
+                if (otro.name == "Rug" || otro.name == "Alfombra") continue; // la alfombra queda bajo la puerta
+                if (Vector2.Distance(otro.transform.position, go.transform.position) < 4f)
+                    Undo.DestroyObjectImmediate(otro.gameObject);
+            }
+
+            Selection.activeGameObject = go;
+            TraducirEscena(go.scene);
+            EditorSceneManager.MarkSceneDirty(go.scene);
         }
 
         // =====================================================================

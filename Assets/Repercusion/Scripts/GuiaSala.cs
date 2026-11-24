@@ -10,17 +10,21 @@ namespace Repercusion
     public class GuiaSala : MonoBehaviour
     {
         [Header("Partes de la sala")]
+        [Tooltip("Losas donde se avisa que presione E (pon todas, así no delata cuáles son las buenas)")]
         public PlacaPresion[] placasBuenas;
         public Puerta reja;
 
         [Header("Mensajes")]
         [TextArea] public string alEntrar1 = "Está oscuro: la oscuridad gasta tu luz. Los braseros la recargan";
-        [TextArea] public string alEntrar2 = "Acércate a la inscripción de piedra para leerla";
-        [TextArea] public string enPlacaBuena = "Presiona R: dejarás un eco aquí que sostendrá la placa";
-        [TextArea] public string trasPrimerEco = "Tu eco sostiene esa piedra. Falta otra, también lejos del fuego";
-        [TextArea] public string trasSegundoEco = "Tus ecos sostienen las dos piedras. Ve a la reja";
-        [TextArea] public string alReiniciar = "Empieza de nuevo: deja un eco en cada piedra de la sombra";
+        [TextArea] public string alEntrar2 = "Acércate a la tablilla que brilla en el muro";
+        [Tooltip("Vacío = no se dice nada")]
+        [TextArea] public string enPlacaBuena = "";
+        [TextArea] public string trasPrimerEco = "Al pisar una losa, tu eco se queda en ella… pero no por mucho. Sigue el orden de la tablilla";
+        [TextArea] public string trasSegundoEco = "La reja se abrió. Ve por la llave";
+        [TextArea] public string rejaSigueCerrada = "";
+        [TextArea] public string alReiniciar = "";
         [TextArea] public string rejaAbierta = "La reja se abrió";
+        [TextArea] public string ordenEquivocado = "";
         public float duracion = 4.5f;
 
         private readonly Queue<string> cola = new Queue<string>();
@@ -30,6 +34,8 @@ namespace Repercusion
         private int ecosAntes;
         private bool dijoReja;
         private float proximoAvisoPlaca;
+        private bool dijoOrden;
+        private float revisarRejaEn = -1f;
 
         private void Awake()
         {
@@ -64,7 +70,9 @@ namespace Repercusion
             else if (aqui)
             {
                 if (actuales == 1 && ecosAntes == 0) Decir(trasPrimerEco);
-                else if (actuales >= 2 && ecosAntes < 2) Decir(trasSegundoEco);
+                // Con el segundo eco no se promete nada: se revisa la reja un instante después
+                // (las losas y la reja se actualizan en el siguiente cuadro de física)
+                else if (maximo > 0 && actuales >= maximo) revisarRejaEn = Time.time + 0.35f;   // también al reemplazar un eco
                 else if (actuales == 0 && ecosAntes > 0) Decir(alReiniciar);
             }
 
@@ -74,6 +82,7 @@ namespace Repercusion
 
         private void Decir(string texto)
         {
+            if (string.IsNullOrEmpty(texto)) return;
             // Lo nuevo es más importante que lo que estaba en fila
             cola.Clear();
             cola.Enqueue(texto);
@@ -85,12 +94,27 @@ namespace Repercusion
             if (dentro)
             {
                 // Parada en una placa buena y todavía le quedan ecos: le decimos qué hacer
-                if (ecosAntes < 2 && Time.time >= proximoAvisoPlaca && PisandoPlacaBuena())
+                if (!string.IsNullOrEmpty(enPlacaBuena) && Time.time >= proximoAvisoPlaca && PisandoPlacaBuena())
                 {
                     Decir(enPlacaBuena);
                     proximoAvisoPlaca = Time.time + 8f;
                 }
-                if (reja != null && reja.Abierta && !dijoReja)
+                if (revisarRejaEn > 0f && Time.time >= revisarRejaEn)
+                {
+                    revisarRejaEn = -1f;
+                    if (reja == null || reja.Abierta) { dijoReja = true; Decir(trasSegundoEco); }
+                    else if (reja.OrdenEquivocado) { dijoOrden = true; Decir(ordenEquivocado); }
+                    else Decir(rejaSigueCerrada);
+                }
+                bool revisando = revisarRejaEn > 0f;
+                if (!revisando && reja != null && reja.OrdenEquivocado && !dijoOrden)
+                {
+                    dijoOrden = true;
+                    Decir(ordenEquivocado);
+                }
+                if (reja != null && !reja.OrdenEquivocado) dijoOrden = false;
+                if (reja != null && !reja.Abierta) dijoReja = false;
+                if (!revisando && reja != null && reja.Abierta && !dijoReja)
                 {
                     dijoReja = true;
                     Decir(rejaAbierta);

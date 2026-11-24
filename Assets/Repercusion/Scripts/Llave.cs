@@ -38,6 +38,7 @@ namespace Repercusion
             if (otro.GetComponentInParent<LuzEco>() == null) return; // solo Eco, no sus ecos
 
             tomada = true;
+            SonidosJuego.Tocar(SonidosJuego.Tipo.Llave);
             if (GameManager.Instancia != null) GameManager.Instancia.AgregarLlave();
             if (efectoAlTomar != null) Instantiate(efectoAlTomar, transform.position, Quaternion.identity);
             Destroy(gameObject);

@@ -13,6 +13,7 @@ namespace Repercusion
         public Color colorAbierta = new Color(1f, 1f, 1f, 0.35f);
 
         public string mensajeFaltan = "La puerta está sellada. Te faltan {0} llaves";
+        public string mensajeFaltaUna = "La puerta está sellada. Te falta 1 llave";
         public string mensajeFinal = "Escapaste. Fin de la demo";
 
         [Tooltip("Opcional: escena que se carga al salir (por ejemplo, el menú). Vacío = no carga nada")]
@@ -37,12 +38,14 @@ namespace Repercusion
                     if (spriteAbierta != null) visual.sprite = spriteAbierta;
                     visual.color = colorAbierta;
                 }
-                GameManager.Mensaje(mensajeFinal);
+                GameManager.Mensaje(mensajeFinal, esperaAntesDeCargar + 1f);
+                SonidosJuego.Tocar(SonidosJuego.Tipo.Reja);
                 if (!string.IsNullOrEmpty(escenaAlTerminar)) Invoke(nameof(Cargar), esperaAntesDeCargar);
             }
             else
             {
-                GameManager.Mensaje(string.Format(mensajeFaltan, gm.llavesNecesarias - gm.Llaves));
+                int faltan = gm.llavesNecesarias - gm.Llaves;
+                GameManager.Mensaje(faltan == 1 ? mensajeFaltaUna : string.Format(mensajeFaltan, faltan));
             }
         }
 

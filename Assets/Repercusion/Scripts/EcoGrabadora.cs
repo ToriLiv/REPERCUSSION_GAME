@@ -7,7 +7,9 @@ using UnityEngine.Events;
 namespace Repercusion
 {
     // LA MECÁNICA PRINCIPAL. Va en el objeto de Eco.
-    // Dentro de una SalaPuzle graba cada intento. Al presionar R:
+    // Con "ecos quietos" (la sala lo decide): al presionar E o R, Eco deja una copia
+    // de sí misma justo donde está parada y sigue jugando desde ahí.
+    // Con ecos que repiten: dentro de una SalaPuzle graba cada intento. Al presionar E o R:
     //   1) el intento grabado se convierte en un "eco" que repite tus movimientos,
     //   2) Eco vuelve al inicio de la sala,
     //   3) todos los ecos repiten su camino desde el principio, al mismo tiempo que tú.
@@ -17,6 +19,7 @@ namespace Repercusion
     public class EcoGrabadora : MonoBehaviour
     {
         public KeyCode teclaNuevoIntento = KeyCode.R;
+        public KeyCode teclaEco = KeyCode.E;
 
         [Tooltip("Segundos máximos que se graba cada intento")]
         public float duracionMaxima = 40f;
@@ -32,6 +35,8 @@ namespace Repercusion
 
         // (ecos actuales, máximo de la sala, si está dentro de una sala)
         public static event Action<int, int, bool> OnEcosCambiaron;
+        // Un eco se desvaneció porque se le acabó el tiempo
+        public static event Action OnEcoDesvanecido;
 
         public SalaPuzle SalaActual => sala;
 
@@ -67,7 +72,31 @@ namespace Repercusion
 
         private void Update()
         {
-            if (sala != null && Time.timeScale > 0f && Entrada.Tecla(teclaNuevoIntento))
+            // Ecos con tiempo: los que ya cumplieron su vida se desvanecen
+            if (sala != null && sala.vidaEco > 0f)
+            {
+                bool cambio = false;
+                for (int i = ecos.Count - 1; i >= 0; i--)
+                {
+                    EcoFantasma e = ecos[i];
+                    if (e != null && !e.Expirado) continue;
+                    if (e != null) Destroy(e.gameObject);
+                    ecos.RemoveAt(i);
+                    cambio = true;
+                }
+                if (cambio)
+                {
+                    SonidosJuego.Tocar(SonidosJuego.Tipo.Eco, 0.4f);
+                    OnEcoDesvanecido?.Invoke();
+                    Avisar();
+                }
+            }
+
+            // Junto a una tablilla, la E sirve para leer (no deja eco)
+            if (Tablilla.Cercana != null || PanelLectura.Abierto) return;
+            if (sala != null && sala.ecosAutomaticos) return;   // en esta sala los ecos salen solos
+            if (sala != null && Time.timeScale > 0f &&
+                (Entrada.Tecla(teclaEco) || Entrada.Tecla(teclaNuevoIntento)))
                 NuevoIntento();
         }
 
@@ -129,6 +158,7 @@ namespace Repercusion
         public void NuevoIntento()
         {
             if (sala == null) return;
+            if (sala.ecosQuietos) { DejarEcoAqui(); return; }
 
             // Solo vale la pena dejar un eco si el intento duró algo
             if (sala.maxEcos > 0 && posiciones.Count > 5)
@@ -147,6 +177,61 @@ namespace Repercusion
             {
                 if (e != null) e.Reiniciar();
             }
+            EmpezarGrabacion();
+            alNuevoIntento?.Invoke();
+            Avisar();
+        }
+
+        // Deja un eco quieto en un punto (lo usan las losas automáticas)
+        public EcoFantasma DejarEcoEn(Vector2 punto)
+        {
+            if (sala == null || sala.maxEcos <= 0) return null;
+            LimpiarGrabacion();
+            posiciones.Add(punto);
+            direcciones.Add(Vector2.down);
+            moviendose.Add(false);
+            if (ecos.Count >= sala.maxEcos)
+            {
+                EcoFantasma viejo = ecos[0];
+                ecos.RemoveAt(0);
+                if (viejo != null) Destroy(viejo.gameObject);
+            }
+            EcoFantasma nuevo = CrearEco();
+            ecos.Add(nuevo);
+            SonidosJuego.Tocar(SonidosJuego.Tipo.Eco);
+            EmpezarGrabacion();
+            Avisar();
+            return nuevo;
+        }
+
+        // Borra los ecos de la sala sin mover a Eco
+        public void BorrarEcosDeSala()
+        {
+            BorrarEcos();
+            EmpezarGrabacion();
+            Avisar();
+        }
+
+        // Deja un eco quieto justo donde está Eco. Ella no se mueve.
+        // Si ya están todos los ecos de la sala, el más viejo desaparece.
+        private void DejarEcoAqui()
+        {
+            if (sala.maxEcos <= 0) return;
+
+            LimpiarGrabacion();
+            posiciones.Add(Posicion());
+            direcciones.Add(ultimaDir);
+            moviendose.Add(false);
+
+            if (ecos.Count >= sala.maxEcos)
+            {
+                EcoFantasma viejo = ecos[0];
+                ecos.RemoveAt(0);
+                if (viejo != null) Destroy(viejo.gameObject);
+            }
+            ecos.Add(CrearEco());
+            SonidosJuego.Tocar(SonidosJuego.Tipo.Eco);
+
             EmpezarGrabacion();
             alNuevoIntento?.Invoke();
             Avisar();
@@ -248,6 +333,7 @@ namespace Repercusion
             eco.Configurar(posiciones.ToArray(), direcciones.ToArray(), moviendose.ToArray(),
                            Time.fixedDeltaTime, animEco, anim != null ? anim.parameters : null,
                            copia, colorEco, parpadeo);
+            if (sala != null) eco.vida = sala.vidaEco;
             return eco;
         }
 

@@ -10,6 +10,9 @@ namespace Repercusion
         [Tooltip("Todas estas placas deben estar presionadas para abrir")]
         public PlacaPresion[] placas;
 
+        [Tooltip("Si está activo, las placas deben presionarse en el orden de la lista")]
+        public bool enOrden = false;
+
         [Tooltip("Si alguna de estas está presionada, la puerta NO abre (placas trampa)")]
         public PlacaPresion[] placasProhibidas;
 
@@ -28,6 +31,12 @@ namespace Repercusion
         public UnityEvent alCerrar;
 
         public bool Abierta { get; private set; }
+
+        // Todas las placas están presionadas, pero no en el orden correcto
+        public bool OrdenEquivocado { get; private set; }
+
+        private float[] momentoPresionada;
+        private bool[] estabaPresionada;
 
         private Color colorCerrada = Color.white;
 
@@ -58,6 +67,30 @@ namespace Repercusion
                 }
             }
 
+            // Orden: cada placa tiene que haberse presionado después de la anterior
+            if (enOrden && placas != null)
+            {
+                if (momentoPresionada == null || momentoPresionada.Length != placas.Length)
+                {
+                    momentoPresionada = new float[placas.Length];
+                    estabaPresionada = new bool[placas.Length];
+                }
+                for (int i = 0; i < placas.Length; i++)
+                {
+                    bool ahora = placas[i] != null && placas[i].Presionada;
+                    if (ahora && !estabaPresionada[i]) momentoPresionada[i] = Time.time;
+                    estabaPresionada[i] = ahora;
+                }
+                OrdenEquivocado = false;
+                if (todas)
+                {
+                    for (int i = 1; i < placas.Length; i++)
+                    {
+                        if (momentoPresionada[i] < momentoPresionada[i - 1]) { todas = false; OrdenEquivocado = true; break; }
+                    }
+                }
+            }
+
             if (todas && placasProhibidas != null)
             {
                 foreach (PlacaPresion p in placasProhibidas)
@@ -73,6 +106,7 @@ namespace Repercusion
         {
             Abierta = abrir;
             Aplicar(abrir);
+            if (Time.timeSinceLevelLoad > 0.5f) SonidosJuego.Tocar(SonidosJuego.Tipo.Reja, abrir ? 1f : 0.6f);
             if (abrir) alAbrir?.Invoke();
             else alCerrar?.Invoke();
         }

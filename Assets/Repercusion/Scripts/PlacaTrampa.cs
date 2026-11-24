@@ -33,6 +33,7 @@ namespace Repercusion
             if (pisada && !estabaPisada)
             {
                 luz.Quitar(luzQueQuita);
+                SonidosJuego.Tocar(SonidosJuego.Tipo.Trampa);
                 if (!string.IsNullOrEmpty(mensaje)) GameManager.Mensaje(mensaje);
             }
             estabaPisada = pisada;

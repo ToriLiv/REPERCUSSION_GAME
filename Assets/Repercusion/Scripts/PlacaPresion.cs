@@ -57,7 +57,11 @@ namespace Repercusion
 
             Presionada = alguienEncima;
             Aplicar(Presionada);
-            if (Presionada) alPresionar?.Invoke();
+            if (Presionada)
+            {
+                SonidosJuego.Tocar(SonidosJuego.Tipo.Losa, 0.8f);
+                alPresionar?.Invoke();
+            }
             else alSoltar?.Invoke();
         }
 
